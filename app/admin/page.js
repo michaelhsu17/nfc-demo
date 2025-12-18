@@ -24,6 +24,29 @@ export default function AdminPage() {
     const [editFormData, setEditFormData] = useState({ nfc_id: '', video_url: '' });
     const [editingId, setEditingId] = useState(null);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [showAddForm, setShowAddForm] = useState(false);
+
+    // Generate random NFC ID (uppercase letters and numbers only)
+    const generateNfcId = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 12; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
+
+    // Toggle add form visibility
+    const toggleAddForm = () => {
+        if (!showAddForm) {
+            // Generate new NFC ID when opening the form
+            setAddFormData({ nfc_id: generateNfcId(), video_url: '' });
+        } else {
+            // Clear form when closing
+            setAddFormData({ nfc_id: '', video_url: '' });
+        }
+        setShowAddForm(!showAddForm);
+    };
 
     // Fetch all cards
     const fetchCards = async () => {
@@ -66,6 +89,7 @@ export default function AdminPage() {
             if (data.success) {
                 showMessage('success', '新增成功！');
                 setAddFormData({ nfc_id: '', video_url: '' });
+                setShowAddForm(false);
                 fetchCards();
             } else {
                 showMessage('error', data.error);
@@ -154,45 +178,54 @@ export default function AdminPage() {
                 </div>
             )}
 
-            {/* Add Form */}
-            <form onSubmit={handleAddSubmit} className="admin-card">
-                <h2 className="admin-card-title">
-                    <FontAwesomeIcon icon={faPlus} />
-                    新增
-                </h2>
-                <div className="admin-form-group">
-                    <label className="admin-label">
-                        <FontAwesomeIcon icon={faCreditCard} />
-                        NFC ID
-                    </label>
-                    <input
-                        type="text"
-                        value={addFormData.nfc_id}
-                        onChange={(e) => setAddFormData({ ...addFormData, nfc_id: e.target.value })}
-                        className="admin-input"
-                        placeholder="輸入 NFC ID"
-                        required
-                    />
-                </div>
-                <div className="admin-form-group">
-                    <label className="admin-label">
-                        <FontAwesomeIcon icon={faVideo} />
-                        Video URL
-                    </label>
-                    <input
-                        type="url"
-                        value={addFormData.video_url}
-                        onChange={(e) => setAddFormData({ ...addFormData, video_url: e.target.value })}
-                        className="admin-input"
-                        placeholder="輸入影片網址"
-                        required
-                    />
-                </div>
-                <button type="submit" className="admin-btn admin-btn-primary">
-                    <FontAwesomeIcon icon={faPlus} />
-                    新增
+            {/* Add Form Toggle Button */}
+            <div className="admin-card">
+                <button
+                    type="button"
+                    onClick={toggleAddForm}
+                    className={`admin-btn ${showAddForm ? 'admin-btn-secondary' : 'admin-btn-primary'}`}
+                >
+                    <FontAwesomeIcon icon={showAddForm ? faXmark : faPlus} />
+                    {showAddForm ? '取消新增' : '新增 NFC'}
                 </button>
-            </form>
+
+                {/* Collapsible Add Form */}
+                {showAddForm && (
+                    <form onSubmit={handleAddSubmit} className="admin-add-form-content">
+                        <div className="admin-form-group">
+                            <label className="admin-label">
+                                <FontAwesomeIcon icon={faCreditCard} />
+                                NFC ID（自動產生）
+                            </label>
+                            <input
+                                type="text"
+                                value={addFormData.nfc_id}
+                                className="admin-input admin-input-readonly"
+                                placeholder="自動產生的 NFC ID"
+                                readOnly
+                            />
+                        </div>
+                        <div className="admin-form-group">
+                            <label className="admin-label">
+                                <FontAwesomeIcon icon={faVideo} />
+                                Video URL
+                            </label>
+                            <input
+                                type="url"
+                                value={addFormData.video_url}
+                                onChange={(e) => setAddFormData({ ...addFormData, video_url: e.target.value })}
+                                className="admin-input"
+                                placeholder="輸入影片網址"
+                                required
+                            />
+                        </div>
+                        <button type="submit" className="admin-btn admin-btn-primary">
+                            <FontAwesomeIcon icon={faPlus} />
+                            確認新增
+                        </button>
+                    </form>
+                )}
+            </div>
 
             {/* Table */}
             <div className="admin-card">
@@ -314,6 +347,11 @@ export default function AdminPage() {
                     </table>
                 )}
             </div>
+
+            {/* Instruction */}
+            <p className="admin-instruction">
+                請把 NFC ID 直接拷貝進 NFC tag 中即可
+            </p>
         </div>
     );
 }
