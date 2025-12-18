@@ -7,8 +7,8 @@ const nunito = Nunito({
 })
 
 export const metadata = {
-    title: 'NFC Demo',
-    description: 'NFC Demo 個人宣傳頁面',
+    title: '17 NFC',
+    description: '17 NFC',
 }
 
 export default function RootLayout({ children }) {
