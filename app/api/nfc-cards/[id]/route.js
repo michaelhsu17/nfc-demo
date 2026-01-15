@@ -1,11 +1,43 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
+
+// Check if user can access this card (owner or admin)
+async function canAccessCard(user, cardId) {
+    if (user.isAdmin) return true;
+
+    const result = await pool.query(
+        'SELECT user_id FROM nfc_cards WHERE id = $1',
+        [cardId]
+    );
+
+    if (result.rows.length === 0) return false;
+    return result.rows[0].user_id === user.userId;
+}
 
 // PUT update nfc card
 export async function PUT(request, { params }) {
     const { id } = await params;
 
     try {
+        const user = await getCurrentUser();
+
+        if (!user) {
+            return NextResponse.json(
+                { success: false, error: '請先登入' },
+                { status: 401 }
+            );
+        }
+
+        // Check permission
+        const hasAccess = await canAccessCard(user, id);
+        if (!hasAccess) {
+            return NextResponse.json(
+                { success: false, error: '無權限編輯此卡片' },
+                { status: 403 }
+            );
+        }
+
         const { nfc_id, video_url } = await request.json();
 
         if (!nfc_id || !video_url) {
@@ -16,7 +48,7 @@ export async function PUT(request, { params }) {
         }
 
         const result = await pool.query(
-            'UPDATE nfc_cards SET nfc_id = $1, video_url = $2 WHERE id = $3 RETURNING id, nfc_id, video_url, created_at',
+            'UPDATE nfc_cards SET nfc_id = $1, video_url = $2 WHERE id = $3 RETURNING id, nfc_id, video_url, user_id, created_at',
             [nfc_id, video_url, id]
         );
 
@@ -48,6 +80,24 @@ export async function DELETE(request, { params }) {
     const { id } = await params;
 
     try {
+        const user = await getCurrentUser();
+
+        if (!user) {
+            return NextResponse.json(
+                { success: false, error: '請先登入' },
+                { status: 401 }
+            );
+        }
+
+        // Check permission
+        const hasAccess = await canAccessCard(user, id);
+        if (!hasAccess) {
+            return NextResponse.json(
+                { success: false, error: '無權限刪除此卡片' },
+                { status: 403 }
+            );
+        }
+
         const result = await pool.query(
             'DELETE FROM nfc_cards WHERE id = $1 RETURNING id',
             [id]

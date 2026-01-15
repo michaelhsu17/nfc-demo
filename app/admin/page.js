@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faCreditCard,
@@ -14,10 +14,18 @@ import {
     faSpinner,
     faCircleCheck,
     faCircleExclamation,
+    faRightFromBracket,
+    faUser,
+    faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 import './admin.css';
+import LoginForm from './components/LoginForm';
+import UserManagement from './components/UserManagement';
 
 export default function AdminPage() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [authLoading, setAuthLoading] = useState(true);
+    const [user, setUser] = useState(null);
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(true);
     const [addFormData, setAddFormData] = useState({ nfc_id: '', video_url: '' });
@@ -25,6 +33,42 @@ export default function AdminPage() {
     const [editingId, setEditingId] = useState(null);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [showAddForm, setShowAddForm] = useState(false);
+    const [activeTab, setActiveTab] = useState('nfc'); // 'nfc' or 'users'
+
+    // Check authentication on mount
+    useEffect(() => {
+        checkAuth();
+    }, []);
+
+    const checkAuth = async () => {
+        try {
+            const res = await fetch('/api/auth/me');
+            const data = await res.json();
+            if (data.success) {
+                setIsAuthenticated(true);
+                setUser(data.data);
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
+    const handleLoginSuccess = (userData) => {
+        setIsAuthenticated(true);
+        setUser(userData);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            setIsAuthenticated(false);
+            setUser(null);
+        } catch (error) {
+            console.error('Logout failed:', error);
+        }
+    };
 
     // Generate random NFC ID (uppercase letters and numbers only)
     const generateNfcId = () => {
@@ -64,8 +108,10 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
-        fetchCards();
-    }, []);
+        if (isAuthenticated) {
+            fetchCards();
+        }
+    }, [isAuthenticated]);
 
     // Show message
     const showMessage = (type, text) => {
@@ -160,12 +206,44 @@ export default function AdminPage() {
         setEditingId(null);
     };
 
+    // Show loading state while checking auth
+    if (authLoading) {
+        return (
+            <div className="admin-container">
+                <div className="admin-loading-full">
+                    <FontAwesomeIcon icon={faSpinner} spin size="3x" />
+                    <p>載入中...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show login form if not authenticated
+    if (!isAuthenticated) {
+        return <LoginForm onLoginSuccess={handleLoginSuccess} />;
+    }
+
     return (
         <div className="admin-container">
-            <h1 className="admin-title">
-                <FontAwesomeIcon icon={faCreditCard} className="admin-title-icon" />
-                17 NFC
-            </h1>
+            {/* Header with logout button */}
+            <div className="admin-header">
+                <h1 className="admin-title">
+                    <FontAwesomeIcon icon={faCreditCard} className="admin-title-icon" />
+                    17 NFC
+                </h1>
+                <div className="admin-user-info">
+                    <span className="admin-username">
+                        {user?.username}
+                    </span>
+                    <button
+                        onClick={handleLogout}
+                        className="admin-btn admin-btn-secondary admin-btn-small"
+                    >
+                        <FontAwesomeIcon icon={faRightFromBracket} />
+                        登出
+                    </button>
+                </div>
+            </div>
 
             {/* Message */}
             {message.text && (
@@ -178,180 +256,216 @@ export default function AdminPage() {
                 </div>
             )}
 
-            {/* Add Form Toggle Button */}
-            <div className="admin-card">
-                <button
-                    type="button"
-                    onClick={toggleAddForm}
-                    className={`admin-btn ${showAddForm ? 'admin-btn-secondary' : 'admin-btn-primary'}`}
-                >
-                    <FontAwesomeIcon icon={showAddForm ? faXmark : faPlus} />
-                    {showAddForm ? '取消新增' : '新增 NFC'}
-                </button>
+            {/* Tab Navigation - Admin Only */}
+            {user?.isAdmin && (
+                <div className="admin-tabs">
+                    <button
+                        className={`admin-tab ${activeTab === 'nfc' ? 'admin-tab-active' : ''}`}
+                        onClick={() => setActiveTab('nfc')}
+                    >
+                        <FontAwesomeIcon icon={faCreditCard} />
+                        NFC 卡片
+                    </button>
+                    <button
+                        className={`admin-tab ${activeTab === 'users' ? 'admin-tab-active' : ''}`}
+                        onClick={() => setActiveTab('users')}
+                    >
+                        <FontAwesomeIcon icon={faUsers} />
+                        使用者管理
+                    </button>
+                </div>
+            )}
 
-                {/* Collapsible Add Form */}
-                {showAddForm && (
-                    <form onSubmit={handleAddSubmit} className="admin-add-form-content">
-                        <div className="admin-form-group">
-                            <label className="admin-label">
-                                <FontAwesomeIcon icon={faCreditCard} />
-                                NFC ID（自動產生）
-                            </label>
-                            <input
-                                type="text"
-                                value={addFormData.nfc_id}
-                                className="admin-input admin-input-readonly"
-                                placeholder="自動產生的 NFC ID"
-                                readOnly
-                            />
-                        </div>
-                        <div className="admin-form-group">
-                            <label className="admin-label">
-                                <FontAwesomeIcon icon={faVideo} />
-                                Video URL
-                            </label>
-                            <input
-                                type="url"
-                                value={addFormData.video_url}
-                                onChange={(e) => setAddFormData({ ...addFormData, video_url: e.target.value })}
-                                className="admin-input"
-                                placeholder="輸入影片網址"
-                                required
-                            />
-                        </div>
-                        <button type="submit" className="admin-btn admin-btn-primary">
-                            <FontAwesomeIcon icon={faPlus} />
-                            確認新增
+            {/* NFC Cards Tab Content */}
+            {(activeTab === 'nfc' || !user?.isAdmin) && (
+                <>
+                    {/* NFC Cards List */}
+                    <div className="admin-card">
+                        <h2 className="admin-card-title">
+                            <FontAwesomeIcon icon={faList} />
+                            NFC 卡片列表
+                        </h2>
+
+                        {/* Add Button */}
+                        <button
+                            type="button"
+                            onClick={toggleAddForm}
+                            className={`admin-btn ${showAddForm ? 'admin-btn-secondary' : 'admin-btn-primary'}`}
+                            style={{ marginBottom: '20px' }}
+                        >
+                            <FontAwesomeIcon icon={showAddForm ? faXmark : faPlus} />
+                            {showAddForm ? '取消新增' : '新增 NFC'}
                         </button>
-                    </form>
-                )}
-            </div>
 
-            {/* Table */}
-            <div className="admin-card">
-                <h2 className="admin-card-title">
-                    <FontAwesomeIcon icon={faList} />
-                    列表
-                </h2>
-                {loading ? (
-                    <p className="admin-loading">
-                        <FontAwesomeIcon icon={faSpinner} spin />
-                        載入中...
-                    </p>
-                ) : cards.length === 0 ? (
-                    <p className="admin-empty">尚無資料</p>
-                ) : (
-                    <table className="admin-table">
-                        <thead>
-                            <tr>
-                                <th>
-                                    <FontAwesomeIcon icon={faCreditCard} />
-                                    NFC ID
-                                </th>
-                                <th>
-                                    <FontAwesomeIcon icon={faVideo} />
-                                    Video URL
-                                </th>
-                                <th>建立時間</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {cards.map((card, index) => (
-                                <>
-                                    <tr
-                                        key={card.id}
-                                        className="admin-table-row"
-                                        style={{ animationDelay: `${index * 0.1}s` }}
-                                    >
-                                        <td>{card.nfc_id}</td>
-                                        <td className="admin-url-cell">
-                                            <a href={card.video_url} target="_blank" rel="noopener noreferrer" className="admin-link">
-                                                {card.video_url}
-                                            </a>
-                                        </td>
-                                        <td>
-                                            {new Date(card.created_at).toLocaleString('zh-TW')}
-                                        </td>
-                                        <td>
-                                            <div className="admin-actions">
-                                                <button
-                                                    onClick={() => handleEdit(card)}
-                                                    className="admin-btn admin-btn-primary admin-btn-small"
-                                                >
-                                                    <FontAwesomeIcon icon={faPen} />
-                                                    編輯
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(card.id)}
-                                                    className="admin-btn admin-btn-danger admin-btn-small"
-                                                >
-                                                    <FontAwesomeIcon icon={faTrash} />
-                                                    刪除
-                                                </button>
-                                            </div>
-                                        </td>
+                        {/* Collapsible Add Form */}
+                        {showAddForm && (
+                            <form onSubmit={handleAddSubmit} className="admin-add-form-content">
+                                <div className="admin-form-group">
+                                    <label className="admin-label">
+                                        <FontAwesomeIcon icon={faCreditCard} />
+                                        NFC ID（自動產生）
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={addFormData.nfc_id}
+                                        className="admin-input admin-input-readonly"
+                                        placeholder="自動產生的 NFC ID"
+                                        readOnly
+                                    />
+                                </div>
+                                <div className="admin-form-group">
+                                    <label className="admin-label">
+                                        <FontAwesomeIcon icon={faVideo} />
+                                        Video URL
+                                    </label>
+                                    <input
+                                        type="url"
+                                        value={addFormData.video_url}
+                                        onChange={(e) => setAddFormData({ ...addFormData, video_url: e.target.value })}
+                                        className="admin-input"
+                                        placeholder="輸入影片網址"
+                                        required
+                                    />
+                                </div>
+                                <button type="submit" className="admin-btn admin-btn-primary">
+                                    <FontAwesomeIcon icon={faPlus} />
+                                    確認新增
+                                </button>
+                            </form>
+                        )}
+
+                        {/* Table */}
+                        {loading ? (
+                            <p className="admin-loading">
+                                <FontAwesomeIcon icon={faSpinner} spin />
+                                載入中...
+                            </p>
+                        ) : cards.length === 0 ? (
+                            <p className="admin-empty">尚無資料</p>
+                        ) : (
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <FontAwesomeIcon icon={faCreditCard} />
+                                            NFC ID
+                                        </th>
+                                        <th>
+                                            <FontAwesomeIcon icon={faVideo} />
+                                            Video URL
+                                        </th>
+                                        {user?.isAdmin && <th><FontAwesomeIcon icon={faUser} /> 擁有者</th>}
+                                        <th>建立時間</th>
+                                        <th>操作</th>
                                     </tr>
-                                    {/* Inline Edit Form */}
-                                    {editingId === card.id && (
-                                        <tr key={`edit-${card.id}`} className="admin-edit-row">
-                                            <td colSpan={4}>
-                                                <form onSubmit={handleEditSubmit} className="admin-edit-form">
-                                                    <div className="admin-edit-inputs">
-                                                        <div className="admin-edit-group">
-                                                            <label className="admin-label">
-                                                                <FontAwesomeIcon icon={faCreditCard} />
-                                                                NFC ID
-                                                            </label>
-                                                            <input
-                                                                type="text"
-                                                                value={editFormData.nfc_id}
-                                                                onChange={(e) => setEditFormData({ ...editFormData, nfc_id: e.target.value })}
-                                                                className="admin-input"
-                                                                placeholder="輸入 NFC ID"
-                                                                required
-                                                            />
-                                                        </div>
-                                                        <div className="admin-edit-group">
-                                                            <label className="admin-label">
-                                                                <FontAwesomeIcon icon={faVideo} />
-                                                                Video URL
-                                                            </label>
-                                                            <input
-                                                                type="url"
-                                                                value={editFormData.video_url}
-                                                                onChange={(e) => setEditFormData({ ...editFormData, video_url: e.target.value })}
-                                                                className="admin-input"
-                                                                placeholder="輸入影片網址"
-                                                                required
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="admin-edit-buttons">
-                                                        <button type="submit" className="admin-btn admin-btn-success">
-                                                            <FontAwesomeIcon icon={faFloppyDisk} />
-                                                            儲存
+                                </thead>
+                                <tbody>
+                                    {cards.map((card, index) => (
+                                        <Fragment key={card.id}>
+                                            <tr
+                                                className="admin-table-row"
+                                                style={{ animationDelay: `${index * 0.1}s` }}
+                                            >
+                                                <td>{card.nfc_id}</td>
+                                                <td className="admin-url-cell">
+                                                    <a href={card.video_url} target="_blank" rel="noopener noreferrer" className="admin-link">
+                                                        {card.video_url}
+                                                    </a>
+                                                </td>
+                                                {user?.isAdmin && (
+                                                    <td>
+                                                        <span className="admin-owner-badge">
+                                                            {card.owner_username || '未指定'}
+                                                        </span>
+                                                    </td>
+                                                )}
+                                                <td>
+                                                    {new Date(card.created_at).toLocaleString('zh-TW')}
+                                                </td>
+                                                <td>
+                                                    <div className="admin-actions">
+                                                        <button
+                                                            onClick={() => handleEdit(card)}
+                                                            className="admin-btn admin-btn-primary admin-btn-small"
+                                                        >
+                                                            <FontAwesomeIcon icon={faPen} />
+                                                            編輯
                                                         </button>
-                                                        <button type="button" onClick={handleCancelEdit} className="admin-btn admin-btn-secondary">
-                                                            <FontAwesomeIcon icon={faXmark} />
-                                                            取消
+                                                        <button
+                                                            onClick={() => handleDelete(card.id)}
+                                                            className="admin-btn admin-btn-danger admin-btn-small"
+                                                        >
+                                                            <FontAwesomeIcon icon={faTrash} />
+                                                            刪除
                                                         </button>
                                                     </div>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+                                                </td>
+                                            </tr>
+                                            {/* Inline Edit Form */}
+                                            {editingId === card.id && (
+                                                <tr key={`edit-${card.id}`} className="admin-edit-row">
+                                                    <td colSpan={user?.isAdmin ? 5 : 4}>
+                                                        <form onSubmit={handleEditSubmit} className="admin-edit-form">
+                                                            <div className="admin-edit-inputs">
+                                                                <div className="admin-edit-group">
+                                                                    <label className="admin-label">
+                                                                        <FontAwesomeIcon icon={faCreditCard} />
+                                                                        NFC ID
+                                                                    </label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editFormData.nfc_id}
+                                                                        onChange={(e) => setEditFormData({ ...editFormData, nfc_id: e.target.value })}
+                                                                        className="admin-input"
+                                                                        placeholder="輸入 NFC ID"
+                                                                        required
+                                                                    />
+                                                                </div>
+                                                                <div className="admin-edit-group">
+                                                                    <label className="admin-label">
+                                                                        <FontAwesomeIcon icon={faVideo} />
+                                                                        Video URL
+                                                                    </label>
+                                                                    <input
+                                                                        type="url"
+                                                                        value={editFormData.video_url}
+                                                                        onChange={(e) => setEditFormData({ ...editFormData, video_url: e.target.value })}
+                                                                        className="admin-input"
+                                                                        placeholder="輸入影片網址"
+                                                                        required
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div className="admin-edit-buttons">
+                                                                <button type="submit" className="admin-btn admin-btn-success">
+                                                                    <FontAwesomeIcon icon={faFloppyDisk} />
+                                                                    儲存
+                                                                </button>
+                                                                <button type="button" onClick={handleCancelEdit} className="admin-btn admin-btn-secondary">
+                                                                    <FontAwesomeIcon icon={faXmark} />
+                                                                    取消
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
 
-            {/* Instruction */}
-            <p className="admin-instruction">
-                請把 NFC ID 直接拷貝進 NFC tag 中即可
-            </p>
+                    {/* Instruction */}
+                    <p className="admin-instruction">
+                        請把 NFC ID 直接拷貝進 NFC tag 中即可
+                    </p>
+                </>
+            )}
+
+            {/* User Management Tab - Admin Only */}
+            {user?.isAdmin && activeTab === 'users' && <UserManagement />}
         </div>
     );
 }
