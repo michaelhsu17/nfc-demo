@@ -5,21 +5,31 @@ export async function GET(request, { params }) {
     const { nfc_id } = await params;
 
     try {
-        const result = await pool.query(
-            'SELECT audio_url FROM nfc_cards WHERE nfc_id = $1',
+        // Get NFC card data
+        const cardResult = await pool.query(
+            'SELECT audio_url, user_id FROM nfc_cards WHERE nfc_id = $1',
             [nfc_id]
         );
 
-        if (result.rows.length === 0) {
+        if (cardResult.rows.length === 0) {
             return NextResponse.json(
                 { success: false, error: 'NFC ID not found' },
                 { status: 404 }
             );
         }
 
+        const card = cardResult.rows[0];
+
+        // Get user contents for this user
+        const contentsResult = await pool.query(
+            'SELECT content_url, content_type FROM user_contents WHERE user_id = $1 ORDER BY created_at DESC',
+            [card.user_id]
+        );
+
         return NextResponse.json({
             success: true,
-            audio_url: result.rows[0].audio_url,
+            audio_url: card.audio_url,
+            user_contents: contentsResult.rows,
         });
     } catch (error) {
         console.error('Database error:', error);
