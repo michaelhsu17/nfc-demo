@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faUsers,
@@ -17,12 +17,10 @@ import {
     faBan,
     faRotate,
     faIdCard,
-    faImage,
-    faVideo,
-    faTrash,
-    faUpload,
     faFolder,
+    faCopy,
 } from '@fortawesome/free-solid-svg-icons';
+import ContentManager from './ContentManager';
 
 export default function UserManagement() {
     const [users, setUsers] = useState([]);
@@ -33,11 +31,8 @@ export default function UserManagement() {
     const [editFormData, setEditFormData] = useState({ username: '', password: '', is_admin: false, open_id: '' });
     const [message, setMessage] = useState({ type: '', text: '' });
     const [viewingContentsUserId, setViewingContentsUserId] = useState(null);
-    const [userContents, setUserContents] = useState([]);
-    const [contentsLoading, setContentsLoading] = useState(false);
-    const [uploadContentType, setUploadContentType] = useState('image');
-    const [uploading, setUploading] = useState(false);
-    const fileInputRef = useRef(null);
+    const [resetPasswordModal, setResetPasswordModal] = useState(null); // { userId, username, newPassword }
+    const [deactivateModal, setDeactivateModal] = useState(null); // { userId, username }
 
     // Generate random password (16 characters)
     const generatePassword = () => {
@@ -73,30 +68,9 @@ export default function UserManagement() {
         }
     };
 
-    const fetchUserContents = async (userId) => {
-        setContentsLoading(true);
-        try {
-            const res = await fetch(`/api/users/${userId}/contents`);
-            const data = await res.json();
-            if (data.success) {
-                setUserContents(data.data);
-            }
-        } catch (error) {
-            console.error('Error fetching contents:', error);
-        } finally {
-            setContentsLoading(false);
-        }
-    };
-
     useEffect(() => {
         fetchUsers();
     }, []);
-
-    useEffect(() => {
-        if (viewingContentsUserId) {
-            fetchUserContents(viewingContentsUserId);
-        }
-    }, [viewingContentsUserId]);
 
     const showMessage = (type, text) => {
         setMessage({ type, text });
@@ -113,7 +87,7 @@ export default function UserManagement() {
             });
             const data = await res.json();
             if (data.success) {
-                showMessage('success', '使用者建立成功！');
+                showMessage('success', '使用者（主播）建立成功！');
                 setAddFormData({ username: '', password: '', is_admin: false, open_id: '' });
                 setShowAddForm(false);
                 fetchUsers();
@@ -154,10 +128,15 @@ export default function UserManagement() {
         setEditingId(user.id);
     };
 
-    const handleResetPassword = async (userId, username) => {
+    const openResetPasswordModal = (userId, username) => {
         const newPassword = generatePassword();
-        if (!confirm(`確定要重設 ${username} 的密碼嗎？\n\n新密碼將是: ${newPassword}`)) return;
+        setResetPasswordModal({ userId, username, newPassword });
+    };
 
+    const confirmResetPassword = async () => {
+        if (!resetPasswordModal) return;
+
+        const { userId, newPassword } = resetPasswordModal;
         try {
             const res = await fetch(`/api/users/${userId}`, {
                 method: 'PUT',
@@ -166,7 +145,8 @@ export default function UserManagement() {
             });
             const data = await res.json();
             if (data.success) {
-                showMessage('success', `密碼已重設為: ${newPassword}`);
+                showMessage('success', '密碼已重設成功');
+                setResetPasswordModal(null);
             } else {
                 showMessage('error', data.error);
             }
@@ -175,13 +155,19 @@ export default function UserManagement() {
         }
     };
 
-    const handleDeactivate = async (id) => {
-        if (!confirm('確定要停用此使用者嗎？')) return;
+    const openDeactivateModal = (userId, username) => {
+        setDeactivateModal({ userId, username });
+    };
+
+    const confirmDeactivate = async () => {
+        if (!deactivateModal) return;
+
         try {
-            const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/users/${deactivateModal.userId}`, { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
-                showMessage('success', '使用者已停用');
+                showMessage('success', '使用者（主播）已停用');
+                setDeactivateModal(null);
                 fetchUsers();
             } else {
                 showMessage('error', data.error);
@@ -191,61 +177,13 @@ export default function UserManagement() {
         }
     };
 
-    const handleFileUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('content_type', uploadContentType);
-
-            const res = await fetch(`/api/users/${viewingContentsUserId}/contents`, {
-                method: 'POST',
-                body: formData,
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchUserContents(viewingContentsUserId);
-                showMessage('success', '上傳成功');
-            } else {
-                showMessage('error', data.error);
-            }
-        } catch {
-            showMessage('error', '上傳失敗');
-        } finally {
-            setUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-
-    const handleDeleteContent = async (contentId) => {
-        if (!confirm('確定要刪除此內容嗎？')) return;
-
-        try {
-            const res = await fetch(`/api/users/${viewingContentsUserId}/contents?contentId=${contentId}`, {
-                method: 'DELETE',
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchUserContents(viewingContentsUserId);
-                showMessage('success', '內容已刪除');
-            } else {
-                showMessage('error', data.error);
-            }
-        } catch {
-            showMessage('error', '刪除失敗');
-        }
-    };
+    const viewingUser = users.find(u => u.id === viewingContentsUserId);
 
     return (
         <div className="admin-card">
             <h2 className="admin-card-title">
                 <FontAwesomeIcon icon={faUsers} />
-                使用者管理
+                使用者（主播）管理
             </h2>
 
             {message.text && (
@@ -266,38 +204,50 @@ export default function UserManagement() {
                 style={{ marginBottom: '20px' }}
             >
                 <FontAwesomeIcon icon={showAddForm ? faXmark : faPlus} />
-                {showAddForm ? '取消' : '新增使用者'}
+                {showAddForm ? '取消' : '新增使用者（主播）'}
             </button>
 
             {/* Add Form */}
             {showAddForm && (
                 <form onSubmit={handleAddSubmit} className="admin-add-form-content">
-                    <div className="admin-edit-inputs">
-                        <div className="admin-edit-group">
-                            <label className="admin-label">
-                                <FontAwesomeIcon icon={faUser} />
-                                帳號
-                            </label>
-                            <input
-                                type="text"
-                                value={addFormData.username}
-                                onChange={(e) => setAddFormData({ ...addFormData, username: e.target.value })}
-                                className="admin-input"
-                                placeholder="輸入帳號"
-                                required
-                            />
-                        </div>
-                        <div className="admin-edit-group">
-                            <label className="admin-label">
-                                <FontAwesomeIcon icon={faLock} />
-                                密碼（自動產生）
-                            </label>
+                    <div className="admin-form-group">
+                        <label className="admin-label">
+                            <FontAwesomeIcon icon={faUser} />
+                            帳號
+                        </label>
+                        <input
+                            type="text"
+                            value={addFormData.username}
+                            onChange={(e) => setAddFormData({ ...addFormData, username: e.target.value })}
+                            className="admin-input"
+                            placeholder="輸入帳號"
+                            required
+                        />
+                    </div>
+                    <div className="admin-form-group">
+                        <label className="admin-label">
+                            <FontAwesomeIcon icon={faLock} />
+                            密碼（自動產生）
+                        </label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <input
                                 type="text"
                                 value={addFormData.password}
                                 className="admin-input admin-input-readonly"
                                 readOnly
+                                style={{ flex: 1 }}
                             />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(addFormData.password);
+                                    showMessage('success', '密碼已複製到剪貼簿');
+                                }}
+                                className="admin-btn admin-btn-info"
+                                title="複製密碼"
+                            >
+                                <FontAwesomeIcon icon={faCopy} />
+                            </button>
                         </div>
                     </div>
                     <div className="admin-form-group">
@@ -326,19 +276,19 @@ export default function UserManagement() {
                     </div>
                     <button type="submit" className="admin-btn admin-btn-primary">
                         <FontAwesomeIcon icon={faPlus} />
-                        建立使用者
+                        新增使用者（主播）
                     </button>
                 </form>
             )}
 
-            {/* Users Table */}
-            {loading ? (
+            {/* Users Table - hidden when add form is open */}
+            {!showAddForm && (loading ? (
                 <p className="admin-loading">
                     <FontAwesomeIcon icon={faSpinner} spin />
                     載入中...
                 </p>
             ) : users.length === 0 ? (
-                <p className="admin-empty">尚無使用者</p>
+                <p className="admin-empty">尚無使用者（主播）</p>
             ) : (
                 <table className="admin-table">
                     <thead>
@@ -358,7 +308,7 @@ export default function UserManagement() {
                                 <td>
                                     <span className={`admin-badge ${u.is_admin ? 'admin-badge-admin' : 'admin-badge-user'}`}>
                                         <FontAwesomeIcon icon={u.is_admin ? faShield : faUser} />
-                                        {u.is_admin ? 'Admin' : '使用者'}
+                                        {u.is_admin ? 'Admin' : '使用者（主播）'}
                                     </span>
                                 </td>
                                 <td>
@@ -374,6 +324,7 @@ export default function UserManagement() {
                                             title="編輯"
                                         >
                                             <FontAwesomeIcon icon={faPen} />
+                                            編輯
                                         </button>
                                         <button
                                             onClick={() => setViewingContentsUserId(u.id)}
@@ -381,21 +332,24 @@ export default function UserManagement() {
                                             title="內容管理"
                                         >
                                             <FontAwesomeIcon icon={faFolder} />
+                                            內容管理
                                         </button>
                                         <button
-                                            onClick={() => handleResetPassword(u.id, u.username)}
+                                            onClick={() => openResetPasswordModal(u.id, u.username)}
                                             className="admin-btn admin-btn-warning admin-btn-small"
                                             title="重設密碼"
                                         >
                                             <FontAwesomeIcon icon={faRotate} />
+                                            重設密碼
                                         </button>
                                         {!u.is_deactivated && (
                                             <button
-                                                onClick={() => handleDeactivate(u.id)}
+                                                onClick={() => openDeactivateModal(u.id, u.username)}
                                                 className="admin-btn admin-btn-danger admin-btn-small"
                                                 title="停用"
                                             >
                                                 <FontAwesomeIcon icon={faBan} />
+                                                停用
                                             </button>
                                         )}
                                     </div>
@@ -404,13 +358,13 @@ export default function UserManagement() {
                         ))}
                     </tbody>
                 </table>
-            )}
+            ))}
 
             {/* Edit Modal */}
             {editingId && (
                 <div className="admin-modal-overlay" onClick={() => setEditingId(null)}>
                     <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-                        <h3>編輯使用者</h3>
+                        <h3>編輯使用者（主播）</h3>
                         <form onSubmit={handleEditSubmit}>
                             <div className="admin-form-group">
                                 <label className="admin-label">
@@ -464,92 +418,104 @@ export default function UserManagement() {
                 </div>
             )}
 
-            {/* Contents Modal */}
-            {viewingContentsUserId && (
-                <div className="admin-modal-overlay" onClick={() => setViewingContentsUserId(null)}>
-                    <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
-                        <h3>
-                            <FontAwesomeIcon icon={faFolder} />
-                            內容管理 - {users.find(u => u.id === viewingContentsUserId)?.username}
-                        </h3>
+            {/* Content Manager Modal */}
+            {viewingContentsUserId && viewingUser && (
+                <ContentManager
+                    userId={viewingContentsUserId}
+                    username={viewingUser.username}
+                    onClose={() => setViewingContentsUserId(null)}
+                />
+            )}
 
-                        {/* Upload Form */}
-                        <div className="admin-upload-form">
-                            <div className="admin-content-type-selector">
+            {/* Reset Password Modal */}
+            {resetPasswordModal && (
+                <div className="admin-modal-overlay" onClick={() => setResetPasswordModal(null)}>
+                    <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3>
+                            <FontAwesomeIcon icon={faRotate} />
+                            重設密碼
+                        </h3>
+                        <p style={{ marginBottom: '16px', color: '#475569' }}>
+                            確定要重設 <strong>{resetPasswordModal.username}</strong> 的密碼嗎？
+                        </p>
+                        <div className="admin-form-group">
+                            <label className="admin-label">
+                                <FontAwesomeIcon icon={faLock} />
+                                新密碼
+                            </label>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="text"
+                                    value={resetPasswordModal.newPassword}
+                                    className="admin-input admin-input-readonly"
+                                    readOnly
+                                    style={{ flex: 1 }}
+                                />
                                 <button
                                     type="button"
-                                    className={`admin-type-btn ${uploadContentType === 'image' ? 'active' : ''}`}
-                                    onClick={() => setUploadContentType('image')}
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(resetPasswordModal.newPassword);
+                                        showMessage('success', '新密碼已複製到剪貼簿');
+                                    }}
+                                    className="admin-btn admin-btn-info"
+                                    title="複製密碼"
                                 >
-                                    <FontAwesomeIcon icon={faImage} />
-                                    圖片
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`admin-type-btn ${uploadContentType === 'video' ? 'active' : ''}`}
-                                    onClick={() => setUploadContentType('video')}
-                                >
-                                    <FontAwesomeIcon icon={faVideo} />
-                                    影片
+                                    <FontAwesomeIcon icon={faCopy} />
                                 </button>
                             </div>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept={uploadContentType === 'image' ? 'image/*' : 'video/*'}
-                                onChange={handleFileUpload}
-                                style={{ display: 'none' }}
-                            />
+                        </div>
+                        <div className="admin-edit-buttons">
                             <button
                                 type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="admin-btn admin-btn-primary"
-                                disabled={uploading}
+                                onClick={confirmResetPassword}
+                                className="admin-btn admin-btn-warning"
                             >
-                                {uploading ? (
-                                    <><FontAwesomeIcon icon={faSpinner} spin /> 上傳中...</>
-                                ) : (
-                                    <><FontAwesomeIcon icon={faUpload} /> 上傳 {uploadContentType === 'image' ? '圖片' : '影片'}</>
-                                )}
+                                <FontAwesomeIcon icon={faRotate} />
+                                確認重設
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setResetPasswordModal(null)}
+                                className="admin-btn admin-btn-secondary"
+                            >
+                                <FontAwesomeIcon icon={faXmark} />
+                                取消
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
 
-                        {/* Contents Grid */}
-                        {contentsLoading ? (
-                            <p className="admin-loading">
-                                <FontAwesomeIcon icon={faSpinner} spin />
-                                載入中...
-                            </p>
-                        ) : userContents.length === 0 ? (
-                            <p className="admin-empty">尚無內容</p>
-                        ) : (
-                            <div className="admin-contents-grid">
-                                {userContents.map((content) => (
-                                    <div key={content.id} className="admin-content-item">
-                                        {content.content_type === 'image' ? (
-                                            <img src={content.content_url} alt="" />
-                                        ) : (
-                                            <video src={content.content_url} controls />
-                                        )}
-                                        <div className="admin-content-badge">
-                                            <FontAwesomeIcon icon={content.content_type === 'image' ? faImage : faVideo} />
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteContent(content.id)}
-                                            className="admin-content-delete"
-                                            title="刪除"
-                                        >
-                                            <FontAwesomeIcon icon={faTrash} />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        <div className="admin-edit-buttons" style={{ marginTop: '20px' }}>
-                            <button type="button" onClick={() => setViewingContentsUserId(null)} className="admin-btn admin-btn-secondary">
+            {/* Deactivate Modal */}
+            {deactivateModal && (
+                <div className="admin-modal-overlay" onClick={() => setDeactivateModal(null)}>
+                    <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+                        <h3>
+                            <FontAwesomeIcon icon={faBan} />
+                            停用使用者（主播）
+                        </h3>
+                        <p style={{ marginBottom: '20px', color: '#475569' }}>
+                            確定要停用 <strong>{deactivateModal.username}</strong> 嗎？
+                        </p>
+                        <p style={{ marginBottom: '20px', color: '#dc2626', fontSize: '0.9rem' }}>
+                            停用後該使用者（主播）將無法登入系統。
+                        </p>
+                        <div className="admin-edit-buttons">
+                            <button
+                                type="button"
+                                onClick={confirmDeactivate}
+                                className="admin-btn admin-btn-danger"
+                            >
+                                <FontAwesomeIcon icon={faBan} />
+                                確認停用
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeactivateModal(null)}
+                                className="admin-btn admin-btn-secondary"
+                            >
                                 <FontAwesomeIcon icon={faXmark} />
-                                關閉
+                                取消
                             </button>
                         </div>
                     </div>

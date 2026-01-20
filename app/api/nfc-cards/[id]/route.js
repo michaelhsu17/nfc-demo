@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { del } from '@vercel/blob';
 import pool from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -38,18 +39,18 @@ export async function PUT(request, { params }) {
             );
         }
 
-        const { nfc_id, video_url } = await request.json();
+        const { audio_url, viewer_open_id, viewer_user_id } = await request.json();
 
-        if (!nfc_id || !video_url) {
+        if (!viewer_open_id || !viewer_user_id) {
             return NextResponse.json(
-                { success: false, error: 'nfc_id and video_url are required' },
+                { success: false, error: 'viewer_open_id 和 viewer_user_id 都是必填欄位' },
                 { status: 400 }
             );
         }
 
         const result = await pool.query(
-            'UPDATE nfc_cards SET nfc_id = $1, video_url = $2 WHERE id = $3 RETURNING id, nfc_id, video_url, user_id, created_at',
-            [nfc_id, video_url, id]
+            'UPDATE nfc_cards SET audio_url = $1, viewer_open_id = $2, viewer_user_id = $3 WHERE id = $4 RETURNING id, nfc_id, audio_url, user_id, viewer_open_id, viewer_user_id, created_at',
+            [audio_url || null, viewer_open_id, viewer_user_id, id]
         );
 
         if (result.rows.length === 0) {
@@ -98,19 +99,35 @@ export async function DELETE(request, { params }) {
             );
         }
 
-        const result = await pool.query(
-            'DELETE FROM nfc_cards WHERE id = $1 RETURNING id',
+        // First get the audio_url to delete from blob storage
+        const cardResult = await pool.query(
+            'SELECT audio_url FROM nfc_cards WHERE id = $1',
             [id]
         );
 
-        if (result.rows.length === 0) {
+        if (cardResult.rows.length === 0) {
             return NextResponse.json(
                 { success: false, error: 'Record not found' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json({ success: true, message: 'Deleted successfully' });
+        const audioUrl = cardResult.rows[0].audio_url;
+
+        // Delete from database
+        await pool.query('DELETE FROM nfc_cards WHERE id = $1', [id]);
+
+        // Delete audio file from Vercel Blob if exists
+        if (audioUrl) {
+            try {
+                await del(audioUrl);
+            } catch (blobError) {
+                console.error('Failed to delete blob:', blobError);
+                // Continue even if blob deletion fails
+            }
+        }
+
+        return NextResponse.json({ success: true, message: '刪除成功' });
     } catch (error) {
         console.error('Database error:', error);
         return NextResponse.json(

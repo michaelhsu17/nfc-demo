@@ -98,7 +98,9 @@ export default function LoginForm({ onLoginSuccess }) {
                                 onChange={(e) => setRememberMe(e.target.checked)}
                                 className="login-checkbox"
                             />
-                            記住我（7天內免登入）
+                            <span>
+                                記住我
+                            </span>
                         </label>
                     </div>
 

@@ -6,7 +6,7 @@ export async function GET(request, { params }) {
 
     try {
         const result = await pool.query(
-            'SELECT video_url FROM nfc_cards WHERE nfc_id = $1',
+            'SELECT audio_url FROM nfc_cards WHERE nfc_id = $1',
             [nfc_id]
         );
 
@@ -19,7 +19,7 @@ export async function GET(request, { params }) {
 
         return NextResponse.json({
             success: true,
-            video_url: result.rows[0].video_url,
+            audio_url: result.rows[0].audio_url,
         });
     } catch (error) {
         console.error('Database error:', error);

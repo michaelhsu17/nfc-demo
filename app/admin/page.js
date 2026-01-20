@@ -10,17 +10,20 @@ import {
     faTrash,
     faFloppyDisk,
     faXmark,
-    faVideo,
+    faMusic,
     faSpinner,
     faCircleCheck,
     faCircleExclamation,
     faRightFromBracket,
     faUser,
     faUsers,
+    faUpload,
+    faIdCard,
 } from '@fortawesome/free-solid-svg-icons';
 import './admin.css';
 import LoginForm from './components/LoginForm';
 import UserManagement from './components/UserManagement';
+import AudioUploader from './components/AudioUploader';
 
 export default function AdminPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -28,12 +31,14 @@ export default function AdminPage() {
     const [user, setUser] = useState(null);
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [addFormData, setAddFormData] = useState({ nfc_id: '', video_url: '' });
-    const [editFormData, setEditFormData] = useState({ nfc_id: '', video_url: '' });
+    const [addFormData, setAddFormData] = useState({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
+    const [editFormData, setEditFormData] = useState({ audio_url: '', viewer_open_id: '', viewer_user_id: '' });
     const [editingId, setEditingId] = useState(null);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [showAddForm, setShowAddForm] = useState(false);
     const [activeTab, setActiveTab] = useState('nfc'); // 'nfc' or 'users'
+    const [showAudioUploader, setShowAudioUploader] = useState(null); // 'add' or 'edit' or null
+    const [usersList, setUsersList] = useState([]); // For admin to select target user
 
     // Check authentication on mount
     useEffect(() => {
@@ -84,10 +89,10 @@ export default function AdminPage() {
     const toggleAddForm = () => {
         if (!showAddForm) {
             // Generate new NFC ID when opening the form
-            setAddFormData({ nfc_id: generateNfcId(), video_url: '' });
+            setAddFormData({ nfc_id: generateNfcId(), audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
         } else {
             // Clear form when closing
-            setAddFormData({ nfc_id: '', video_url: '' });
+            setAddFormData({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
         }
         setShowAddForm(!showAddForm);
     };
@@ -107,11 +112,27 @@ export default function AdminPage() {
         }
     };
 
+    // Fetch users list (for admin to select target user)
+    const fetchUsers = async () => {
+        try {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            if (data.success) {
+                setUsersList(data.data.filter(u => !u.is_deactivated));
+            }
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    };
+
     useEffect(() => {
         if (isAuthenticated) {
             fetchCards();
+            if (user?.isAdmin) {
+                fetchUsers();
+            }
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, user]);
 
     // Show message
     const showMessage = (type, text) => {
@@ -134,7 +155,7 @@ export default function AdminPage() {
 
             if (data.success) {
                 showMessage('success', '新增成功！');
-                setAddFormData({ nfc_id: '', video_url: '' });
+                setAddFormData({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
                 setShowAddForm(false);
                 fetchCards();
             } else {
@@ -160,7 +181,7 @@ export default function AdminPage() {
 
             if (data.success) {
                 showMessage('success', '更新成功！');
-                setEditFormData({ nfc_id: '', video_url: '' });
+                setEditFormData({ audio_url: '', viewer_open_id: '', viewer_user_id: '' });
                 setEditingId(null);
                 fetchCards();
             } else {
@@ -173,7 +194,11 @@ export default function AdminPage() {
 
     // Handle edit
     const handleEdit = (card) => {
-        setEditFormData({ nfc_id: card.nfc_id, video_url: card.video_url });
+        setEditFormData({
+            audio_url: card.audio_url || '',
+            viewer_open_id: card.viewer_open_id || '',
+            viewer_user_id: card.viewer_user_id || ''
+        });
         setEditingId(card.id);
     };
 
@@ -189,7 +214,7 @@ export default function AdminPage() {
                 showMessage('success', '刪除成功！');
                 if (editingId === id) {
                     setEditingId(null);
-                    setEditFormData({ nfc_id: '', video_url: '' });
+                    setEditFormData({ nfc_id: '', audio_url: '' });
                 }
                 fetchCards();
             } else {
@@ -202,7 +227,7 @@ export default function AdminPage() {
 
     // Cancel edit
     const handleCancelEdit = () => {
-        setEditFormData({ nfc_id: '', video_url: '' });
+        setEditFormData({ nfc_id: '', audio_url: '' });
         setEditingId(null);
     };
 
@@ -271,7 +296,7 @@ export default function AdminPage() {
                         onClick={() => setActiveTab('users')}
                     >
                         <FontAwesomeIcon icon={faUsers} />
-                        使用者管理
+                        使用者（主播）管理
                     </button>
                 </div>
             )}
@@ -286,19 +311,21 @@ export default function AdminPage() {
                             NFC 卡片列表
                         </h2>
 
-                        {/* Add Button */}
-                        <button
-                            type="button"
-                            onClick={toggleAddForm}
-                            className={`admin-btn ${showAddForm ? 'admin-btn-secondary' : 'admin-btn-primary'}`}
-                            style={{ marginBottom: '20px' }}
-                        >
-                            <FontAwesomeIcon icon={showAddForm ? faXmark : faPlus} />
-                            {showAddForm ? '取消新增' : '新增 NFC'}
-                        </button>
+                        {/* Add Button - Admin Only */}
+                        {user?.isAdmin && (
+                            <button
+                                type="button"
+                                onClick={toggleAddForm}
+                                className={`admin-btn ${showAddForm ? 'admin-btn-secondary' : 'admin-btn-primary'}`}
+                                style={{ marginBottom: '20px' }}
+                            >
+                                <FontAwesomeIcon icon={showAddForm ? faXmark : faPlus} />
+                                {showAddForm ? '取消新增' : '新增聲音'}
+                            </button>
+                        )}
 
-                        {/* Collapsible Add Form */}
-                        {showAddForm && (
+                        {/* Collapsible Add Form - Admin Only */}
+                        {user?.isAdmin && showAddForm && (
                             <form onSubmit={handleAddSubmit} className="admin-add-form-content">
                                 <div className="admin-form-group">
                                     <label className="admin-label">
@@ -315,27 +342,84 @@ export default function AdminPage() {
                                 </div>
                                 <div className="admin-form-group">
                                     <label className="admin-label">
-                                        <FontAwesomeIcon icon={faVideo} />
-                                        Video URL
+                                        <FontAwesomeIcon icon={faMusic} />
+                                        音檔
+                                    </label>
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            value={addFormData.audio_url}
+                                            className="admin-input admin-input-readonly"
+                                            placeholder="請上傳音檔"
+                                            readOnly
+                                            style={{ flex: 1 }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAudioUploader('add')}
+                                            className="admin-btn admin-btn-info"
+                                        >
+                                            <FontAwesomeIcon icon={faUpload} />
+                                            上傳
+                                        </button>
+                                    </div>
+                                </div>
+                                {user?.isAdmin && (
+                                    <div className="admin-form-group">
+                                        <label className="admin-label">
+                                            <FontAwesomeIcon icon={faUser} />
+                                            指定主播
+                                        </label>
+                                        <select
+                                            value={addFormData.target_user_id}
+                                            onChange={(e) => setAddFormData({ ...addFormData, target_user_id: e.target.value })}
+                                            className="admin-input"
+                                        >
+                                            {usersList.map((u) => (
+                                                <option key={u.id} value={u.id}>
+                                                    {u.username} {u.open_id ? `(${u.open_id})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                                <div className="admin-form-group">
+                                    <label className="admin-label">
+                                        <FontAwesomeIcon icon={faIdCard} />
+                                        觀眾 Open ID
                                     </label>
                                     <input
-                                        type="url"
-                                        value={addFormData.video_url}
-                                        onChange={(e) => setAddFormData({ ...addFormData, video_url: e.target.value })}
+                                        type="text"
+                                        value={addFormData.viewer_open_id}
+                                        onChange={(e) => setAddFormData({ ...addFormData, viewer_open_id: e.target.value })}
                                         className="admin-input"
-                                        placeholder="輸入影片網址"
+                                        placeholder="輸入觀眾 Open ID"
                                         required
                                     />
                                 </div>
-                                <button type="submit" className="admin-btn admin-btn-primary">
+                                <div className="admin-form-group">
+                                    <label className="admin-label">
+                                        <FontAwesomeIcon icon={faUser} />
+                                        觀眾 User ID
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={addFormData.viewer_user_id}
+                                        onChange={(e) => setAddFormData({ ...addFormData, viewer_user_id: e.target.value })}
+                                        className="admin-input"
+                                        placeholder="輸入觀眾 User ID"
+                                        required
+                                    />
+                                </div>
+                                <button type="submit" className="admin-btn admin-btn-primary" disabled={!addFormData.viewer_open_id || !addFormData.viewer_user_id}>
                                     <FontAwesomeIcon icon={faPlus} />
-                                    確認新增
+                                    新增聲音
                                 </button>
                             </form>
                         )}
 
-                        {/* Table */}
-                        {loading ? (
+                        {/* Table - hidden when add form is open */}
+                        {!showAddForm && (loading ? (
                             <p className="admin-loading">
                                 <FontAwesomeIcon icon={faSpinner} spin />
                                 載入中...
@@ -351,8 +435,12 @@ export default function AdminPage() {
                                             NFC ID
                                         </th>
                                         <th>
-                                            <FontAwesomeIcon icon={faVideo} />
-                                            Video URL
+                                            <FontAwesomeIcon icon={faMusic} />
+                                            Audio URL
+                                        </th>
+                                        <th>
+                                            <FontAwesomeIcon icon={faIdCard} />
+                                            觀眾 Open ID
                                         </th>
                                         {user?.isAdmin && <th><FontAwesomeIcon icon={faUser} /> 擁有者</th>}
                                         <th>建立時間</th>
@@ -368,14 +456,24 @@ export default function AdminPage() {
                                             >
                                                 <td>{card.nfc_id}</td>
                                                 <td className="admin-url-cell">
-                                                    <a href={card.video_url} target="_blank" rel="noopener noreferrer" className="admin-link">
-                                                        {card.video_url}
-                                                    </a>
+                                                    {card.audio_url ? (
+                                                        <a href={card.audio_url} target="_blank" rel="noopener noreferrer" className="admin-link">
+                                                            <FontAwesomeIcon icon={faMusic} style={{ marginRight: '6px' }} />
+                                                            {card.audio_url.split('/').pop()}
+                                                        </a>
+                                                    ) : (
+                                                        <span style={{ color: '#94a3b8' }}>-</span>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    <span style={{ color: '#64748b' }}>
+                                                        {card.viewer_open_id || '-'}
+                                                    </span>
                                                 </td>
                                                 {user?.isAdmin && (
                                                     <td>
                                                         <span className="admin-owner-badge">
-                                                            {card.owner_username || '未指定'}
+                                                            {card.owner_open_id || '未指定'}
                                                         </span>
                                                     </td>
                                                 )}
@@ -384,56 +482,96 @@ export default function AdminPage() {
                                                 </td>
                                                 <td>
                                                     <div className="admin-actions">
-                                                        <button
-                                                            onClick={() => handleEdit(card)}
-                                                            className="admin-btn admin-btn-primary admin-btn-small"
-                                                        >
-                                                            <FontAwesomeIcon icon={faPen} />
-                                                            編輯
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(card.id)}
-                                                            className="admin-btn admin-btn-danger admin-btn-small"
-                                                        >
-                                                            <FontAwesomeIcon icon={faTrash} />
-                                                            刪除
-                                                        </button>
+                                                        {user?.isAdmin ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleEdit(card)}
+                                                                    className="admin-btn admin-btn-primary admin-btn-small"
+                                                                >
+                                                                    <FontAwesomeIcon icon={faPen} />
+                                                                    編輯
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDelete(card.id)}
+                                                                    className="admin-btn admin-btn-danger admin-btn-small"
+                                                                >
+                                                                    <FontAwesomeIcon icon={faTrash} />
+                                                                    刪除
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingId(card.id);
+                                                                    setShowAudioUploader('edit');
+                                                                    setEditFormData({ nfc_id: card.nfc_id, audio_url: card.audio_url || '' });
+                                                                }}
+                                                                className="admin-btn admin-btn-info admin-btn-small"
+                                                            >
+                                                                <FontAwesomeIcon icon={faUpload} />
+                                                                上傳音檔
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
-                                            {/* Inline Edit Form */}
-                                            {editingId === card.id && (
+                                            {/* Inline Edit Form - Admin Only */}
+                                            {user?.isAdmin && editingId === card.id && (
                                                 <tr key={`edit-${card.id}`} className="admin-edit-row">
-                                                    <td colSpan={user?.isAdmin ? 5 : 4}>
+                                                    <td colSpan={user?.isAdmin ? 6 : 5}>
                                                         <form onSubmit={handleEditSubmit} className="admin-edit-form">
                                                             <div className="admin-edit-inputs">
                                                                 <div className="admin-edit-group">
                                                                     <label className="admin-label">
-                                                                        <FontAwesomeIcon icon={faCreditCard} />
-                                                                        NFC ID
+                                                                        <FontAwesomeIcon icon={faIdCard} />
+                                                                        觀眾 Open ID
                                                                     </label>
                                                                     <input
                                                                         type="text"
-                                                                        value={editFormData.nfc_id}
-                                                                        onChange={(e) => setEditFormData({ ...editFormData, nfc_id: e.target.value })}
+                                                                        value={editFormData.viewer_open_id}
+                                                                        onChange={(e) => setEditFormData({ ...editFormData, viewer_open_id: e.target.value })}
                                                                         className="admin-input"
-                                                                        placeholder="輸入 NFC ID"
+                                                                        placeholder="輸入觀眾 Open ID"
                                                                         required
                                                                     />
                                                                 </div>
                                                                 <div className="admin-edit-group">
                                                                     <label className="admin-label">
-                                                                        <FontAwesomeIcon icon={faVideo} />
-                                                                        Video URL
+                                                                        <FontAwesomeIcon icon={faUser} />
+                                                                        觀眾 User ID
                                                                     </label>
                                                                     <input
-                                                                        type="url"
-                                                                        value={editFormData.video_url}
-                                                                        onChange={(e) => setEditFormData({ ...editFormData, video_url: e.target.value })}
+                                                                        type="text"
+                                                                        value={editFormData.viewer_user_id}
+                                                                        onChange={(e) => setEditFormData({ ...editFormData, viewer_user_id: e.target.value })}
                                                                         className="admin-input"
-                                                                        placeholder="輸入影片網址"
+                                                                        placeholder="輸入觀眾 User ID"
                                                                         required
                                                                     />
+                                                                </div>
+                                                                <div className="admin-edit-group">
+                                                                    <label className="admin-label">
+                                                                        <FontAwesomeIcon icon={faMusic} />
+                                                                        音檔
+                                                                    </label>
+                                                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editFormData.audio_url}
+                                                                            className="admin-input admin-input-readonly"
+                                                                            placeholder="請上傳音檔（選填）"
+                                                                            readOnly
+                                                                            style={{ flex: 1 }}
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowAudioUploader('edit')}
+                                                                            className="admin-btn admin-btn-info"
+                                                                        >
+                                                                            <FontAwesomeIcon icon={faUpload} />
+                                                                            上傳
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                             <div className="admin-edit-buttons">
@@ -454,18 +592,29 @@ export default function AdminPage() {
                                     ))}
                                 </tbody>
                             </table>
-                        )}
+                        ))}
                     </div>
-
-                    {/* Instruction */}
-                    <p className="admin-instruction">
-                        請把 NFC ID 直接拷貝進 NFC tag 中即可
-                    </p>
                 </>
             )}
 
             {/* User Management Tab - Admin Only */}
             {user?.isAdmin && activeTab === 'users' && <UserManagement />}
+
+            {/* Audio Uploader Modal */}
+            {showAudioUploader && (
+                <AudioUploader
+                    currentUrl={showAudioUploader === 'add' ? addFormData.audio_url : editFormData.audio_url}
+                    onUploadComplete={(url) => {
+                        if (showAudioUploader === 'add') {
+                            setAddFormData({ ...addFormData, audio_url: url });
+                        } else {
+                            setEditFormData({ ...editFormData, audio_url: url });
+                        }
+                        setShowAudioUploader(null);
+                    }}
+                    onClose={() => setShowAudioUploader(null)}
+                />
+            )}
         </div>
     );
 }

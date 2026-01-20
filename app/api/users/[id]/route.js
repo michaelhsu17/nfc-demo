@@ -69,7 +69,7 @@ export async function PUT(request, { params }) {
 
         if (result.rows.length === 0) {
             return NextResponse.json(
-                { success: false, error: '找不到此使用者' },
+                { success: false, error: '找不到此使用者（主播）' },
                 { status: 404 }
             );
         }
@@ -127,7 +127,7 @@ export async function DELETE(request, { params }) {
 
         if (result.rows.length === 0) {
             return NextResponse.json(
-                { success: false, error: '找不到此使用者' },
+                { success: false, error: '找不到此使用者（主播）' },
                 { status: 404 }
             );
         }
