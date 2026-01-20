@@ -89,10 +89,10 @@ export default function AdminPage() {
     const toggleAddForm = () => {
         if (!showAddForm) {
             // Generate new NFC ID when opening the form
-            setAddFormData({ nfc_id: generateNfcId(), audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
+            setAddFormData({ nfc_id: generateNfcId(), audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '' });
         } else {
             // Clear form when closing
-            setAddFormData({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
+            setAddFormData({ nfc_id: '', audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '' });
         }
         setShowAddForm(!showAddForm);
     };
@@ -155,7 +155,7 @@ export default function AdminPage() {
 
             if (data.success) {
                 showMessage('success', '新增成功！');
-                setAddFormData({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
+                setAddFormData({ nfc_id: '', audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '' });
                 setShowAddForm(false);
                 fetchCards();
             } else {
