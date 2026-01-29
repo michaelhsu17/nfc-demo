@@ -1,7 +1,8 @@
 {
+  "/api/[nfc_id]/route": "app/api/[nfc_id]/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/nfc-cards/route": "app/api/nfc-cards/route.js",
   "/api/users/route": "app/api/users/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/admin/page": "app/admin/page.js"
 }

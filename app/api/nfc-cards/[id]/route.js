@@ -39,7 +39,7 @@ export async function PUT(request, { params }) {
             );
         }
 
-        const { audio_url, viewer_open_id, viewer_user_id } = await request.json();
+        const { audio_url, viewer_open_id, viewer_user_id, emotion } = await request.json();
 
         if (!viewer_open_id || !viewer_user_id) {
             return NextResponse.json(
@@ -49,8 +49,8 @@ export async function PUT(request, { params }) {
         }
 
         const result = await pool.query(
-            'UPDATE nfc_cards SET audio_url = $1, viewer_open_id = $2, viewer_user_id = $3 WHERE id = $4 RETURNING id, nfc_id, audio_url, user_id, viewer_open_id, viewer_user_id, created_at',
-            [audio_url || null, viewer_open_id, viewer_user_id, id]
+            'UPDATE nfc_cards SET audio_url = $1, viewer_open_id = $2, viewer_user_id = $3, emotion = $4 WHERE id = $5 RETURNING id, nfc_id, audio_url, user_id, viewer_open_id, viewer_user_id, emotion, created_at',
+            [audio_url || null, viewer_open_id, viewer_user_id, emotion || null, id]
         );
 
         if (result.rows.length === 0) {

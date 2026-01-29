@@ -4,23 +4,33 @@ import { useState, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faFolder,
-    faImage,
     faVideo,
     faUpload,
     faSpinner,
     faTrash,
     faXmark,
+    faFaceSmile,
+    faFaceAngry,
+    faFaceSadTear,
+    faFaceLaughBeam,
 } from '@fortawesome/free-solid-svg-icons';
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 
+const EMOTIONS = [
+    { key: 'happy', label: '喜', icon: faFaceSmile, color: '#fbbf24' },
+    { key: 'angry', label: '怒', icon: faFaceAngry, color: '#ef4444' },
+    { key: 'sad', label: '哀', icon: faFaceSadTear, color: '#3b82f6' },
+    { key: 'joy', label: '樂', icon: faFaceLaughBeam, color: '#22c55e' },
+];
+
 export default function ContentManager({ userId, username, onClose }) {
     const [contents, setContents] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [uploadContentType, setUploadContentType] = useState('image');
-    const [uploading, setUploading] = useState(false);
+    const [uploadingEmotion, setUploadingEmotion] = useState(null);
     const [error, setError] = useState('');
     const fileInputRef = useRef(null);
+    const currentEmotionRef = useRef(null);
 
     const fetchContents = async () => {
         setLoading(true);
@@ -48,9 +58,20 @@ export default function ContentManager({ userId, username, onClose }) {
         setTimeout(() => setError(''), 3000);
     };
 
+    const getContentForEmotion = (emotion) => {
+        return contents.find((c) => c.emotion === emotion);
+    };
+
+    const handleUploadClick = (emotion) => {
+        currentEmotionRef.current = emotion;
+        fileInputRef.current?.click();
+    };
+
     const handleFileUpload = async (e) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file || !currentEmotionRef.current) return;
+
+        const emotion = currentEmotionRef.current;
 
         // Check file size
         if (file.size > MAX_FILE_SIZE) {
@@ -61,12 +82,13 @@ export default function ContentManager({ userId, username, onClose }) {
             return;
         }
 
-        setUploading(true);
+        setUploadingEmotion(emotion);
         setError('');
         try {
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('content_type', uploadContentType);
+            formData.append('content_type', 'video');
+            formData.append('emotion', emotion);
 
             const res = await fetch(`/api/users/${userId}/contents`, {
                 method: 'POST',
@@ -81,7 +103,8 @@ export default function ContentManager({ userId, username, onClose }) {
         } catch {
             showError('上傳失敗');
         } finally {
-            setUploading(false);
+            setUploadingEmotion(null);
+            currentEmotionRef.current = null;
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -115,7 +138,7 @@ export default function ContentManager({ userId, username, onClose }) {
                 </h3>
 
                 <h5>
-                    影片和圖片將做為這位主播 NFC 背景播放用
+                    每個情緒可上傳一個影片，作為 NFC 背景播放用（最大 4MB）
                 </h5>
 
                 {/* Error Message */}
@@ -125,77 +148,79 @@ export default function ContentManager({ userId, username, onClose }) {
                     </div>
                 )}
 
-                {/* Upload Form */}
-                <div className="admin-upload-form">
-                    <div className="admin-content-type-selector">
-                        <button
-                            type="button"
-                            className={`admin-type-btn ${uploadContentType === 'image' ? 'active' : ''}`}
-                            onClick={() => setUploadContentType('image')}
-                        >
-                            <FontAwesomeIcon icon={faImage} />
-                            圖片
-                        </button>
-                        <button
-                            type="button"
-                            className={`admin-type-btn ${uploadContentType === 'video' ? 'active' : ''}`}
-                            onClick={() => setUploadContentType('video')}
-                        >
-                            <FontAwesomeIcon icon={faVideo} />
-                            影片
-                        </button>
-                    </div>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept={uploadContentType === 'image' ? 'image/*' : 'video/*'}
-                        onChange={handleFileUpload}
-                        style={{ display: 'none' }}
-                    />
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="admin-btn admin-btn-primary"
-                        disabled={uploading}
-                    >
-                        {uploading ? (
-                            <><FontAwesomeIcon icon={faSpinner} spin /> 上傳中...</>
-                        ) : (
-                            <><FontAwesomeIcon icon={faUpload} /> 上傳 {uploadContentType === 'image' ? '圖片' : '影片'}</>
-                        )}
-                    </button>
-                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>最大 4MB</span>
-                </div>
+                {/* Hidden file input */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                />
 
-                {/* Contents Grid */}
+                {/* Emotion Slots Grid */}
                 {loading ? (
                     <p className="admin-loading">
                         <FontAwesomeIcon icon={faSpinner} spin />
                         載入中...
                     </p>
-                ) : contents.length === 0 ? (
-                    <p className="admin-empty">尚無內容</p>
                 ) : (
-                    <div className="admin-contents-grid">
-                        {contents.map((content) => (
-                            <div key={content.id} className="admin-content-item">
-                                {content.content_type === 'image' ? (
-                                    <img src={content.content_url} alt="" />
-                                ) : (
-                                    <video src={content.content_url} controls />
-                                )}
-                                <div className="admin-content-badge">
-                                    <FontAwesomeIcon icon={content.content_type === 'image' ? faImage : faVideo} />
+                    <div className="admin-emotion-grid">
+                        {EMOTIONS.map((emotion) => {
+                            const content = getContentForEmotion(emotion.key);
+                            const isUploading = uploadingEmotion === emotion.key;
+
+                            return (
+                                <div key={emotion.key} className="admin-emotion-card">
+                                    <div className="admin-emotion-header" style={{ borderColor: emotion.color }}>
+                                        <FontAwesomeIcon icon={emotion.icon} style={{ color: emotion.color, fontSize: '1.5rem' }} />
+                                        <span className="admin-emotion-label">{emotion.label}</span>
+                                    </div>
+
+                                    <div className="admin-emotion-content">
+                                        {content ? (
+                                            <>
+                                                <video src={content.content_url} controls />
+                                                <div className="admin-emotion-actions">
+                                                    <button
+                                                        onClick={() => handleUploadClick(emotion.key)}
+                                                        className="admin-btn admin-btn-info admin-btn-small"
+                                                        disabled={isUploading}
+                                                    >
+                                                        {isUploading ? (
+                                                            <FontAwesomeIcon icon={faSpinner} spin />
+                                                        ) : (
+                                                            <FontAwesomeIcon icon={faUpload} />
+                                                        )}
+                                                        替換
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteContent(content.id)}
+                                                        className="admin-btn admin-btn-danger admin-btn-small"
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrash} />
+                                                        刪除
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="admin-emotion-empty">
+                                                <button
+                                                    onClick={() => handleUploadClick(emotion.key)}
+                                                    className="admin-btn admin-btn-primary"
+                                                    disabled={isUploading}
+                                                >
+                                                    {isUploading ? (
+                                                        <><FontAwesomeIcon icon={faSpinner} spin /> 上傳中...</>
+                                                    ) : (
+                                                        <><FontAwesomeIcon icon={faUpload} /> 上傳影片</>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDeleteContent(content.id)}
-                                    className="admin-content-delete"
-                                    title="刪除"
-                                >
-                                    <FontAwesomeIcon icon={faTrash} />
-                                </button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 

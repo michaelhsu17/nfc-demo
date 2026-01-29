@@ -3,6 +3,8 @@ import { put, del } from '@vercel/blob';
 import pool from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
+const VALID_EMOTIONS = ['happy', 'angry', 'sad', 'joy'];
+
 // GET contents for a specific user
 export async function GET(request, { params }) {
     const { id: userId } = await params;
@@ -25,7 +27,7 @@ export async function GET(request, { params }) {
         }
 
         const result = await pool.query(
-            'SELECT id, content_url, content_type, created_at FROM user_contents WHERE user_id = $1 ORDER BY created_at DESC',
+            'SELECT id, content_url, content_type, emotion, created_at FROM user_contents WHERE user_id = $1 ORDER BY created_at DESC',
             [userId]
         );
 
@@ -39,7 +41,7 @@ export async function GET(request, { params }) {
     }
 }
 
-// POST upload new content (image or video)
+// POST upload new content (image or video) for a specific emotion
 export async function POST(request, { params }) {
     const { id: userId } = await params;
 
@@ -63,6 +65,7 @@ export async function POST(request, { params }) {
         const formData = await request.formData();
         const file = formData.get('file');
         const contentType = formData.get('content_type'); // 'image' or 'video'
+        const emotion = formData.get('emotion'); // 'happy', 'angry', 'sad', 'joy'
 
         if (!file) {
             return NextResponse.json(
@@ -78,15 +81,39 @@ export async function POST(request, { params }) {
             );
         }
 
+        if (!emotion || !VALID_EMOTIONS.includes(emotion)) {
+            return NextResponse.json(
+                { success: false, error: '請選擇有效的情緒（happy, angry, sad, joy）' },
+                { status: 400 }
+            );
+        }
+
+        // Check if emotion already exists for this user
+        const existingResult = await pool.query(
+            'SELECT id, content_url FROM user_contents WHERE user_id = $1 AND emotion = $2',
+            [userId, emotion]
+        );
+
+        // If exists, delete old blob
+        if (existingResult.rows.length > 0) {
+            try {
+                await del(existingResult.rows[0].content_url);
+            } catch (blobError) {
+                console.error('Blob delete error:', blobError);
+            }
+            // Delete old record
+            await pool.query('DELETE FROM user_contents WHERE id = $1', [existingResult.rows[0].id]);
+        }
+
         // Upload to Vercel Blob
-        const blob = await put(`user-contents/${userId}/${Date.now()}-${file.name}`, file, {
+        const blob = await put(`user-contents/${userId}/${emotion}-${Date.now()}-${file.name}`, file, {
             access: 'public',
         });
 
         // Save to database
         const result = await pool.query(
-            'INSERT INTO user_contents (user_id, content_url, content_type) VALUES ($1, $2, $3) RETURNING id, content_url, content_type, created_at',
-            [userId, blob.url, contentType]
+            'INSERT INTO user_contents (user_id, content_url, content_type, emotion) VALUES ($1, $2, $3, $4) RETURNING id, content_url, content_type, emotion, created_at',
+            [userId, blob.url, contentType, emotion]
         );
 
         return NextResponse.json({ success: true, data: result.rows[0] }, { status: 201 });
@@ -148,7 +175,6 @@ export async function DELETE(request, { params }) {
             await del(contentResult.rows[0].content_url);
         } catch (blobError) {
             console.error('Blob delete error:', blobError);
-            // Continue to delete from database even if blob delete fails
         }
 
         // Delete from database

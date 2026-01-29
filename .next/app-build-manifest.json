@@ -17,6 +17,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/me/route.js"
     ],
+    "/api/auth/login/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/login/route.js"
+    ],
     "/api/nfc-cards/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -27,10 +32,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/users/route.js"
     ],
-    "/api/nfc-cards/[id]/route": [
+    "/api/users/[id]/contents/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/nfc-cards/[id]/route.js"
+      "static/chunks/app/api/users/[id]/contents/route.js"
+    ],
+    "/api/[nfc_id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/[nfc_id]/route.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

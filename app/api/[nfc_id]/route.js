@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
+// 外部 app 使用
 export async function GET(request, { params }) {
     const { nfc_id } = await params;
 
     try {
         // Get NFC card data
         const cardResult = await pool.query(
-            'SELECT audio_url, user_id FROM nfc_cards WHERE nfc_id = $1',
+            'SELECT audio_url, user_id, emotion FROM nfc_cards WHERE nfc_id = $1',
             [nfc_id]
         );
 
@@ -22,8 +23,8 @@ export async function GET(request, { params }) {
 
         // Get user contents for this user
         const contentsResult = await pool.query(
-            'SELECT content_url, content_type FROM user_contents WHERE user_id = $1 ORDER BY created_at DESC',
-            [card.user_id]
+            'SELECT content_url, content_type, emotion FROM user_contents WHERE user_id = $1 AND emotion = $2 ORDER BY created_at DESC',
+            [card.user_id, card.emotion]
         );
 
         return NextResponse.json({

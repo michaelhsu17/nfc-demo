@@ -19,6 +19,10 @@ import {
     faUsers,
     faUpload,
     faIdCard,
+    faFaceSmile,
+    faFaceAngry,
+    faFaceSadTear,
+    faFaceLaughBeam,
 } from '@fortawesome/free-solid-svg-icons';
 import './admin.css';
 import LoginForm from './components/LoginForm';
@@ -31,8 +35,8 @@ export default function AdminPage() {
     const [user, setUser] = useState(null);
     const [cards, setCards] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [addFormData, setAddFormData] = useState({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '' });
-    const [editFormData, setEditFormData] = useState({ audio_url: '', viewer_open_id: '', viewer_user_id: '' });
+    const [addFormData, setAddFormData] = useState({ nfc_id: '', audio_url: '', target_user_id: '', viewer_open_id: '', viewer_user_id: '', emotion: '' });
+    const [editFormData, setEditFormData] = useState({ audio_url: '', viewer_open_id: '', viewer_user_id: '', emotion: '' });
     const [editingId, setEditingId] = useState(null);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [showAddForm, setShowAddForm] = useState(false);
@@ -89,10 +93,10 @@ export default function AdminPage() {
     const toggleAddForm = () => {
         if (!showAddForm) {
             // Generate new NFC ID when opening the form
-            setAddFormData({ nfc_id: generateNfcId(), audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '' });
+            setAddFormData({ nfc_id: generateNfcId(), audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '', emotion: '' });
         } else {
             // Clear form when closing
-            setAddFormData({ nfc_id: '', audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '' });
+            setAddFormData({ nfc_id: '', audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '', emotion: '' });
         }
         setShowAddForm(!showAddForm);
     };
@@ -155,7 +159,7 @@ export default function AdminPage() {
 
             if (data.success) {
                 showMessage('success', '新增成功！');
-                setAddFormData({ nfc_id: '', audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '' });
+                setAddFormData({ nfc_id: '', audio_url: '', target_user_id: user.userId, viewer_open_id: '', viewer_user_id: '', emotion: '' });
                 setShowAddForm(false);
                 fetchCards();
             } else {
@@ -197,7 +201,8 @@ export default function AdminPage() {
         setEditFormData({
             audio_url: card.audio_url || '',
             viewer_open_id: card.viewer_open_id || '',
-            viewer_user_id: card.viewer_user_id || ''
+            viewer_user_id: card.viewer_user_id || '',
+            emotion: card.emotion || ''
         });
         setEditingId(card.id);
     };
@@ -411,6 +416,29 @@ export default function AdminPage() {
                                         required
                                     />
                                 </div>
+                                <div className="admin-form-group">
+                                    <label className="admin-label">
+                                        情緒
+                                    </label>
+                                    <div className="admin-emotion-selector">
+                                        <button type="button" className={`admin-emotion-btn ${addFormData.emotion === 'happy' ? 'active' : ''}`} onClick={() => setAddFormData({ ...addFormData, emotion: 'happy' })} style={{ '--emotion-color': '#fbbf24' }}>
+                                            <FontAwesomeIcon icon={faFaceSmile} />
+                                            喜
+                                        </button>
+                                        <button type="button" className={`admin-emotion-btn ${addFormData.emotion === 'angry' ? 'active' : ''}`} onClick={() => setAddFormData({ ...addFormData, emotion: 'angry' })} style={{ '--emotion-color': '#ef4444' }}>
+                                            <FontAwesomeIcon icon={faFaceAngry} />
+                                            怒
+                                        </button>
+                                        <button type="button" className={`admin-emotion-btn ${addFormData.emotion === 'sad' ? 'active' : ''}`} onClick={() => setAddFormData({ ...addFormData, emotion: 'sad' })} style={{ '--emotion-color': '#3b82f6' }}>
+                                            <FontAwesomeIcon icon={faFaceSadTear} />
+                                            哀
+                                        </button>
+                                        <button type="button" className={`admin-emotion-btn ${addFormData.emotion === 'joy' ? 'active' : ''}`} onClick={() => setAddFormData({ ...addFormData, emotion: 'joy' })} style={{ '--emotion-color': '#22c55e' }}>
+                                            <FontAwesomeIcon icon={faFaceLaughBeam} />
+                                            樂
+                                        </button>
+                                    </div>
+                                </div>
                                 <button type="submit" className="admin-btn admin-btn-primary" disabled={!addFormData.viewer_open_id || !addFormData.viewer_user_id}>
                                     <FontAwesomeIcon icon={faPlus} />
                                     新增聲音
@@ -570,6 +598,29 @@ export default function AdminPage() {
                                                                         >
                                                                             <FontAwesomeIcon icon={faUpload} />
                                                                             上傳
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="admin-edit-group">
+                                                                    <label className="admin-label">
+                                                                        情緒
+                                                                    </label>
+                                                                    <div className="admin-emotion-selector">
+                                                                        <button type="button" className={`admin-emotion-btn ${editFormData.emotion === 'happy' ? 'active' : ''}`} onClick={() => setEditFormData({ ...editFormData, emotion: 'happy' })} style={{ '--emotion-color': '#fbbf24' }}>
+                                                                            <FontAwesomeIcon icon={faFaceSmile} />
+                                                                            喜
+                                                                        </button>
+                                                                        <button type="button" className={`admin-emotion-btn ${editFormData.emotion === 'angry' ? 'active' : ''}`} onClick={() => setEditFormData({ ...editFormData, emotion: 'angry' })} style={{ '--emotion-color': '#ef4444' }}>
+                                                                            <FontAwesomeIcon icon={faFaceAngry} />
+                                                                            怒
+                                                                        </button>
+                                                                        <button type="button" className={`admin-emotion-btn ${editFormData.emotion === 'sad' ? 'active' : ''}`} onClick={() => setEditFormData({ ...editFormData, emotion: 'sad' })} style={{ '--emotion-color': '#3b82f6' }}>
+                                                                            <FontAwesomeIcon icon={faFaceSadTear} />
+                                                                            哀
+                                                                        </button>
+                                                                        <button type="button" className={`admin-emotion-btn ${editFormData.emotion === 'joy' ? 'active' : ''}`} onClick={() => setEditFormData({ ...editFormData, emotion: 'joy' })} style={{ '--emotion-color': '#22c55e' }}>
+                                                                            <FontAwesomeIcon icon={faFaceLaughBeam} />
+                                                                            樂
                                                                         </button>
                                                                     </div>
                                                                 </div>
